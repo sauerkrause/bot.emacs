@@ -65,3 +65,7 @@
 (defun async-say-command (fn text)
   (funcall fn text))
 (puthash "async-say" 'async-say-command async-command-table)
+
+(defun source-command (text)
+  "https://github.com/sauerkrause/bot.emacs")
+(puthash "source" 'source-command command-table)
