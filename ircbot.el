@@ -6,6 +6,8 @@
 ;; lookup in command-table the function for a command if it exists, call it and pass it the rest of the args.
 (setq command-table (make-hash-table :test 'equal))
 (setq async-command-table (make-hash-table :test 'equal))
+(setq command-needs-auth-table (make-hash-table :test 'equal))
+(setq pending-funcalls (make-hash-table :test 'equal))
 
 ;; hook for rcirc print    
 (defun my-rcirc-highlight-hook (process sender response target text)
@@ -14,13 +16,39 @@
     ;; do your stuff
     (let ((text
 	   (replace-regexp-in-string (format "^%s[^a-zA-Z0-9]*" (regexp-quote (rcirc-nick process))) "" text)))
-      (if (async-command-p text)
-	  (handle-async-command process target text)
-	(let ((reply (handle-command text)))
-	  (when reply
-	    (rcirc-send-message process target reply)))))))
+      (handle-authable-command
+       (gethash (car (split-string text)) command-needs-auth-table)
+       process target text))))
+
+(defun handle-authable-command (auth process target text)
+  (if auth
+      nil
+    (if (async-command-p text)
+	(handle-async-command process target text)
+    (let ((reply (handle-command text)))
+      (when reply
+	(rcirc-send-message process target reply))))))
+
 ;; add the hook
 (add-hook 'rcirc-print-functions 'my-rcirc-highlight-hook)
+
+(defun my-rcirc-authed-hook (process sender response target text)
+  (when (string= sender "NickServ")
+    (let* ((words (split-string text))
+	   (nick (elt words 0))
+	   (second (elt words 1))
+	   (auth-status (when (string= second "ACC")
+			  (string= (elt words 2) "3"))))
+      (when auth-status
+	  (mapcar (lambda (f)
+		    (funcall f))
+		  (gethash nick pending-funcalls)))
+      (remhash nick pending-funcalls))))
+(add-hook 'rcirc-print-functions 'my-rcirc-authed-hook)
+
+(defun append-hash (key value hash)
+  (let ((pending-calls (gethash key hash)))
+    (puthash key (append pending-calls (list value)) hash)))
 
 (defun handle-command (text)
   (let ((words (split-string text)))
@@ -31,6 +59,9 @@
 (defun async-reply (process target reply)
   (rcirc-send-message process target reply))
 
+(defun join-strings (words)
+  (mapconcat 'identity words " "))
+
 (defun handle-async-command (process target text)
   (let ((words (split-string text)))
     (let ((command (gethash (car words) async-command-table)))
@@ -38,6 +69,10 @@
 	(funcall command (lambda (text)
 			   (async-reply process target text))
 		 (mapconcat 'identity (cdr words) " "))))))
+
+(defun authed-command-p (text)
+  (let ((words (split-string text)))
+    (gethash (car words) command-needs-auth-table)))
 
 (defun async-command-p (text)
   (let ((words (split-string text)))
