@@ -1,6 +1,8 @@
 ;; -*- lexical-binding: t -*-
 
 (require 'rcirc)
+(require 'dom)
+(require 'web)
 (require 'cl)
 
 ;; lookup in command-table the function for a command if it exists, call it and pass it the rest of the args.
@@ -121,9 +123,6 @@
 	 (url (format "http://localhost:8000/%s/jellybeans" victim)))
     (spit-page fn url)))
 (puthash "jellybeans" 'jellybeans-command async-command-table)
-
-(require 'dom)
-(require 'web)
 
 (defun xml-from-body (body)
   (with-temp-buffer
