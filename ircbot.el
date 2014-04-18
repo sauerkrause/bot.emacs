@@ -130,9 +130,9 @@
     (xml-parse-region (point-min) (point-max))))
 
 (defun get-weather-description (xml)
-  (format "%s and %s C at %s"
+  (format "%s and %s at %s"
 	  (get-weather-attribute 'weather xml)
-	  (get-weather-attribute 'temp_c xml)
+	  (get-weather-attribute 'temperature_string xml)
 	  (get-weather-attribute 'location xml)))
 
 (defun get-weather-attribute (sym xml)
