@@ -11,6 +11,8 @@
 (setq command-needs-auth-table (make-hash-table :test 'equal))
 (setq pending-funcalls (make-hash-table :test 'equal))
 
+(setq jellybeanjs-host "http://192.168.1.17:8000")
+
 ;; hook for rcirc print    
 (defun my-rcirc-highlight-hook (process sender response target text)
   (when (and (string-match (concat "^" (regexp-quote (rcirc-nick process))) text)
@@ -20,16 +22,16 @@
 	   (replace-regexp-in-string (format "^%s[^a-zA-Z0-9]*" (regexp-quote (rcirc-nick process))) "" text)))
       (handle-authable-command
        (gethash (car (split-string text)) command-needs-auth-table)
-       process target text))))
+       process sender target text))))
 
-(defun handle-authable-command (auth process target text)
+(defun handle-authable-command (auth process sender target text)
   (if auth
       nil
     (if (async-command-p text)
-	(handle-async-command process target text)
-    (let ((reply (handle-command text)))
-      (when reply
-	(rcirc-send-message process target reply))))))
+	(handle-async-command process sender nil target text)
+	(let ((reply (handle-command text process sender nil target)))
+	(when reply
+	  (rcirc-send-message process target reply))))))
 
 ;; add the hook
 (add-hook 'rcirc-print-functions 'my-rcirc-highlight-hook)
@@ -52,11 +54,15 @@
   (let ((pending-calls (gethash key hash)))
     (puthash key (append pending-calls (list value)) hash)))
 
-(defun handle-command (text)
+(defun handle-command (text process sender response target)
   (let ((words (split-string text)))
     (let ((command (gethash (car words) command-table)))
       (when command
-	(funcall command (mapconcat 'identity (cdr words) " "))))))
+	(apply command (list (mapconcat 'identity (cdr words) " ") 
+			       process 
+			       sender 
+			       response 
+			       target))))))
 
 (defun async-reply (process target reply)
   (rcirc-send-message process target reply))
@@ -64,13 +70,14 @@
 (defun join-strings (words)
   (mapconcat 'identity words " "))
 
-(defun handle-async-command (process target text)
+(defun handle-async-command (process sender response target text)
   (let ((words (split-string text)))
     (let ((command (gethash (car words) async-command-table)))
       (when command
 	(funcall command (lambda (text)
 			   (async-reply process target text))
-		 (mapconcat 'identity (cdr words) " "))))))
+		 (mapconcat 'identity (cdr words) " ")
+		 process sender response target)))))
 
 (defun authed-command-p (text)
   (let ((words (split-string text)))
@@ -81,11 +88,11 @@
     (gethash (car words) async-command-table)))
 
 ;; Let's write some commands.
-(defun ping-command (text)
+(defun ping-command (text process sender response target)
   (concat "pong " text))
 (puthash "ping" 'ping-command command-table)
 
-(defun commands-command (text)
+(defun commands-command (text process sender response target)
   (let (commands)
     (let ((fn (lambda (key value)
 		(setq commands (cons key commands)))))
@@ -95,15 +102,15 @@
     (mapconcat 'identity (sort commands 'string<) " "))))
 (puthash "commands" 'commands-command command-table)
 
-(defun say-command (text)
+(defun say-command (text process sender response target)
   text)
 (puthash "say" 'say-command command-table)
 
-(defun async-say-command (fn text)
+(defun async-say-command (fn text process sender response target)
   (funcall fn text))
 (puthash "async-say" 'async-say-command async-command-table)
 
-(defun source-command (text)
+(defun source-command (text process sender response target)
   "https://github.com/sauerkrause/bot.emacs")
 (puthash "source" 'source-command command-table)
 
@@ -112,15 +119,19 @@
   (web-http-get (lambda (httpc header page-data)
 		  (funcall fn page-data))
 		:url url))
-(defun points-command (fn text)
-  (let* ((victim (car (split-string text)))
-	 (url (format "http://localhost:8000/%s/points" victim)))
+(defun points-command (fn text process sender response target)
+  (let* ((victim (if (car (split-string text))
+		     (car (split-string text))
+		   sender))
+	 (url (format "%s/%s/points" jellybeanjs-host victim)))
     (spit-page fn url)))
 (puthash "points" 'points-command async-command-table)
 
-(defun jellybeans-command (fn text)
-  (let* ((victim (car (split-string text)))
-	 (url (format "http://localhost:8000/%s/jellybeans" victim)))
+(defun jellybeans-command (fn text process sender response target)
+  (let* ((victim (if (car (split-string text))
+		     (car (split-string text))
+		   sender))
+	 (url (format "%s/%s/jellybeans" jellybeanjs-host victim)))
     (spit-page fn url)))
 (puthash "jellybeans" 'jellybeans-command async-command-table)
 
@@ -140,11 +151,75 @@
           (car (xml-get-children (car xml)
                                  sym))))
     (car (cddr tmp-node))))
-(defun weather-command (fn text)
+(defun weather-command (fn text process sender response target)
   (let* ((station (car (split-string text)))
 	 (url (format "http://w1.weather.gov/xml/current_obs/%s.xml" station)))
-    (message "%s" url)
     (web-http-get (lambda (httpc headers body)
 		    (funcall fn (get-weather-description (xml-from-body body))))
 		  :url url)))
 (puthash "weather" 'weather-command async-command-table)
+
+(defun random-choice (choices)
+  (if (and choices (listp choices))
+	(let ((element 
+	       (elt choices (random (length choices)))))
+	  element)))
+
+(defun random-command (text process sender response target)
+  (let* ((words (split-string text)))
+    (random-choice words)))
+(puthash "random" 'random-command command-table)
+
+(defun uptime-command (text process sender response target)
+  (shell-command-to-string "uptime"))
+(puthash "uptime" 'uptime-command command-table)
+
+(defun uname-command (text process sender response target)
+  (shell-command-to-string "uname -a"))
+(puthash "uname" 'uname-command command-table)
+
+(defun 8ball-command (text process sender response target)
+  (let ((choices '("It is certain."
+    "It is decidedly so."
+    "Without a doubt."
+    "Yes, definitely."
+    "You may rely on it."
+    "As I see it, yes."
+    "Most likely."
+    "Outlook good."
+    "Yes."
+    "Signs point to yes."
+    "Reply hazy try again."
+    "Ask again later."
+    "Cannot predict now."
+    "Better not tell you now."
+    "Concentrate and ask again."
+    "Don't count on it."
+    "My reply is no."
+    "My sources say no."
+    "Outlook not so good."
+    "Very doubtful.")))
+    (random-choice choices)))
+(puthash "8ball" '8ball-command command-table)
+(defun scale-1-10-command (text process sender response target)
+  (random-choice (mapcar 'number-to-string 
+			 (number-sequence 1 10))))
+(puthash "1->10" 'scale-1-10-command command-table)
+
+(defun post-jellybeans (name number)
+  (let ((query-data (make-hash-table :test 'equal)))
+    (puthash "number" (number-to-string number) query-data)
+    (web-http-post
+     (lambda (con header data)
+       nil)
+     :url (format "http://192.168.1.17:8000/%s/jellybeans" name)
+     :data query-data)))
+
+(defun botsnack-command (text process sender response target)
+  (post-jellybeans sender 1)
+  ":3")
+(puthash "botsnack" 'botsnack-command command-table)
+(defun botsmack-command (text process sender response target)
+  (post-jellybeans sender -1)
+  "3:")
+(puthash "botsmack" 'botsmack-command command-table)
