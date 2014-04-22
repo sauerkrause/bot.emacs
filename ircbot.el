@@ -11,8 +11,6 @@
 (setq command-needs-auth-table (make-hash-table :test 'equal))
 (setq pending-funcalls (make-hash-table :test 'equal))
 
-(setq jellybeanjs-host "http://192.168.1.17:8000")
-
 ;; hook for rcirc print    
 (defun my-rcirc-highlight-hook (process sender response target text)
   (when (and (string-match (concat "^" (regexp-quote (rcirc-nick process))) text)
@@ -25,13 +23,19 @@
        process sender target text))))
 
 (defun handle-authable-command (auth process sender target text)
-  (if auth
-      nil
-    (if (async-command-p text)
-	(handle-async-command process sender nil target text)
-	(let ((reply (handle-command text process sender nil target)))
-	(when reply
-	  (rcirc-send-message process target reply))))))
+  (flet ((handle-line (line)
+		      (rcirc-send-message process target reply)))
+	(if auth
+	    nil
+	  (if (async-command-p text)
+	      (handle-async-command process sender nil target text)
+	    (let* ((reply (handle-command text process sender nil target))
+		   (reply-lines (if (listp reply)
+				    reply
+				  (cons reply nil))))
+	      (mapcar (lambda (r)
+		(rcirc-send-message process target r))
+		      reply-lines))))))
 
 ;; add the hook
 (add-hook 'rcirc-print-functions 'my-rcirc-highlight-hook)
@@ -223,3 +227,8 @@
   (post-jellybeans sender -1)
   "3:")
 (puthash "botsmack" 'botsmack-command command-table)
+
+(defun fortune-command (text process sender response target)
+  (let ((fortune (shell-command-to-string "fortune -s")))
+    (split-string fortune "\n")))
+(puthash "fortune" 'fortune-command command-table)
