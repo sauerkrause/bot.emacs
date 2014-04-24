@@ -238,9 +238,9 @@
 (define-reply poop '("💩"))
 (define-reply look-of-disapproval '("ಠ_ಠ"))
 
-(setq flipped nil)
-(define-reply table-flip (list (let ((result (if flipped
-					     "(╯^_^）╯︵ ┬─┬"
-					   "(╯°□°）╯︵ ┻━┻")))
-			       (setq flipped (not flipped))
-			       result)))
+(let ((flipped nil))
+  (define-reply table-flip (list (let ((result (if flipped
+						   "(╯^_^）╯︵ ┬─┬"
+						 "(╯°□°）╯︵ ┻━┻")))
+				   (setq flipped (not flipped))
+				   result))))
