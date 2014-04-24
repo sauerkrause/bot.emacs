@@ -32,7 +32,9 @@
 	    (let* ((reply (handle-command text process sender nil target))
 		   (reply-lines (if (listp reply)
 				    reply
-				  (cons reply nil))))
+				  (cons (if (stringp reply)
+					    reply
+					  reply) nil))))
 	      (mapcar (lambda (r)
 		(rcirc-send-message process target r))
 		      reply-lines))))))
@@ -123,21 +125,21 @@
   (web-http-get (lambda (httpc header page-data)
 		  (funcall fn page-data))
 		:url url))
-(defun points-command (fn text process sender response target)
-  (let* ((victim (if (car (split-string text))
-		     (car (split-string text))
-		   sender))
-	 (url (format "%s/%s/points" jellybeanjs-host victim)))
-    (spit-page fn url)))
-(puthash "points" 'points-command async-command-table)
+;; (defun points-command (fn text process sender response target)
+;;   (let* ((victim (if (car (split-string text))
+;; 		     (car (split-string text))
+;; 		   sender))
+;; 	 (url (format "%s/%s/points" jellybeanjs-host victim)))
+;;     (spit-page fn url)))
+;; (puthash "points" 'points-command async-command-table)
 
-(defun jellybeans-command (fn text process sender response target)
-  (let* ((victim (if (car (split-string text))
-		     (car (split-string text))
-		   sender))
-	 (url (format "%s/%s/jellybeans" jellybeanjs-host victim)))
-    (spit-page fn url)))
-(puthash "jellybeans" 'jellybeans-command async-command-table)
+;; (defun jellybeans-command (fn text process sender response target)
+;;   (let* ((victim (if (car (split-string text))
+;; 		     (car (split-string text))
+;; 		   sender))
+;; 	 (url (format "%s/%s/jellybeans" jellybeanjs-host victim)))
+;;     (spit-page fn url)))
+;; (puthash "jellybeans" 'jellybeans-command async-command-table)
 
 (defun xml-from-body (body)
   (with-temp-buffer
@@ -174,6 +176,13 @@
     (random-choice words)))
 (puthash "random" 'random-command command-table)
 
+(defmacro define-reply (cmd choices)
+  `(progn
+     (defun ,cmd (text process sender response target)
+       (let ((choices ,choices))
+	 (random-choice choices)))
+     (puthash (symbol-name ',cmd) ',cmd command-table)))
+
 (defun uptime-command (text process sender response target)
   (shell-command-to-string "uptime"))
 (puthash "uptime" 'uptime-command command-table)
@@ -182,8 +191,7 @@
   (shell-command-to-string "uname -a"))
 (puthash "uname" 'uname-command command-table)
 
-(defun 8ball-command (text process sender response target)
-  (let ((choices '("It is certain."
+(define-reply 8ball '("It is certain."
     "It is decidedly so."
     "Without a doubt."
     "Yes, definitely."
@@ -202,13 +210,10 @@
     "My reply is no."
     "My sources say no."
     "Outlook not so good."
-    "Very doubtful.")))
-    (random-choice choices)))
-(puthash "8ball" '8ball-command command-table)
-(defun scale-1-10-command (text process sender response target)
-  (random-choice (mapcar 'number-to-string 
-			 (number-sequence 1 10))))
-(puthash "1->10" 'scale-1-10-command command-table)
+    "Very doubtful."))
+
+(define-reply scale-1->10 (mapcar 'number-to-string
+				  (number-sequence 1 10)))
 
 (defun post-jellybeans (name number)
   (let ((query-data (make-hash-table :test 'equal)))
@@ -219,16 +224,23 @@
      :url (format "http://192.168.1.17:8000/%s/jellybeans" name)
      :data query-data)))
 
-(defun botsnack-command (text process sender response target)
-  (post-jellybeans sender 1)
-  ":3")
-(puthash "botsnack" 'botsnack-command command-table)
-(defun botsmack-command (text process sender response target)
-  (post-jellybeans sender -1)
-  "3:")
-(puthash "botsmack" 'botsmack-command command-table)
+(define-reply botsnack '(":3"))
+(define-reply botsmack '("3:"))
 
 (defun fortune-command (text process sender response target)
   (let ((fortune (shell-command-to-string "fortune -s")))
-    (split-string fortune "\n")))
+    (split-string (replace-regexp-in-string "\t"
+					    "        "
+					    fortune) "\n")))
 (puthash "fortune" 'fortune-command command-table)
+
+(define-reply yes-no '("yes" "no"))
+(define-reply poop '("💩"))
+(define-reply look-of-disapproval '("ಠ_ಠ"))
+
+(setq flipped nil)
+(define-reply table-flip (list (let ((result (if flipped
+					     "(╯^_^）╯︵ ┬─┬"
+					   "(╯°□°）╯︵ ┻━┻")))
+			       (setq flipped (not flipped))
+			       result)))
