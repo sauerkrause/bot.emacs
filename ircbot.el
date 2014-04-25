@@ -35,8 +35,7 @@
 				  (cons (if (stringp reply)
 					    reply
 					  reply) nil))))
-	      (mapcar (lambda (r)
-		(rcirc-send-message process target r))
+	      (mapcar (apply-partially 'rcirc-send-message process target)
 		      reply-lines))))))
 
 ;; add the hook
@@ -50,8 +49,7 @@
 	   (auth-status (when (string= second "ACC")
 			  (string= (elt words 2) "3"))))
       (when auth-status
-	  (mapcar (lambda (f)
-		    (funcall f))
+	  (mapcar 'funcall
 		  (gethash nick pending-funcalls)))
       (remhash nick pending-funcalls))))
 (add-hook 'rcirc-print-functions 'my-rcirc-authed-hook)
@@ -80,8 +78,8 @@
   (let ((words (split-string text)))
     (let ((command (gethash (car words) async-command-table)))
       (when command
-	(funcall command (lambda (text)
-			   (async-reply process target text))
+	(funcall command (apply-partially
+			  'async-reply process target)
 		 (mapconcat 'identity (cdr words) " ")
 		 process sender response target)))))
 
@@ -125,6 +123,7 @@
   (web-http-get (lambda (httpc header page-data)
 		  (funcall fn page-data))
 		:url url))
+
 ;; (defun points-command (fn text process sender response target)
 ;;   (let* ((victim (if (car (split-string text))
 ;; 		     (car (split-string text))
@@ -172,7 +171,8 @@
 	  element)))
 
 (defun random-command (text process sender response target)
-  (let* ((words (split-string text)))
+  (let* ((words (mapcar (apply-partially 'replace-regexp-in-string "^ *" "")
+			(split-string text (if (find ?, text) "," " ")))))
     (random-choice words)))
 (puthash "random" 'random-command command-table)
 
