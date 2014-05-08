@@ -60,7 +60,7 @@
 
 (defun handle-command (text process sender response target)
   (let ((words (split-string text)))
-    (let ((command (gethash (car words) command-table)))
+    (let ((command (gethash (downcase (car words)) command-table)))
       (when command
 	(apply command (list (mapconcat 'identity (cdr words) " ") 
 			       process 
@@ -76,7 +76,7 @@
 
 (defun handle-async-command (process sender response target text)
   (let ((words (split-string text)))
-    (let ((command (gethash (car words) async-command-table)))
+    (let ((command (gethash (downcase (car words)) async-command-table)))
       (when command
 	(funcall command (apply-partially
 			  'async-reply process target)
@@ -85,11 +85,11 @@
 
 (defun authed-command-p (text)
   (let ((words (split-string text)))
-    (gethash (car words) command-needs-auth-table)))
+    (gethash (downcase (car words)) command-needs-auth-table)))
 
 (defun async-command-p (text)
   (let ((words (split-string text)))
-    (gethash (car words) async-command-table)))
+    (gethash (downcase (car words)) async-command-table)))
 
 ;; Let's write some commands.
 (defun ping-command (text process sender response target)
@@ -244,3 +244,36 @@
 						 "(╯°□°）╯︵ ┻━┻")))
 				   (setq flipped (not flipped))
 				   result))))
+
+(let ((nato-table (make-hash-table :test 'equal)))
+  (labels ((as-in (alos)
+		  (mapcar (apply-partially 'format "as in %s") alos))
+	   (letter-as-in (letter list)
+			 (cons letter (as-in list))))
+  (mapcar (lambda (cons)
+	    (puthash (car cons)
+		     (cdr cons)
+		     nato-table))
+	    (list
+	     (letter-as-in "a" '("aether" "aegis" "aeon" "aisle"))
+	     (letter-as-in "c" '("czar" "cent" "hundred" "cnidaria"))
+	     (letter-as-in "d" '("django"))
+	     (letter-as-in "e" '("ewe"))
+	     (letter-as-in "g" '("gnat" "gnome" "gnu"))
+	     (letter-as-in "h" '("hour" "honor" "herb"))
+	     (letter-as-in "k" '("knight" "knot"))
+	     (letter-as-in "l" '("fifty"))
+	     (letter-as-in "m" '("mnemonic" "thousand"))
+	     (letter-as-in "o" '("opossum" "over"))
+	     (letter-as-in "p" '("pneumonia" "pneumatic" "psalm" "pterodactyl" "pseudoscience"))
+	     (letter-as-in "q" '("qatar"))
+	     (letter-as-in "t" '("tsar"))
+	     (letter-as-in "v" '("five"))
+	     (letter-as-in "w" '("write" "wraith" "write"))
+	     (letter-as-in "x" '("xylophone" "Xilinx" "ten" "xenophobia"))
+	     (letter-as-in "y" '("ypres")))))
+  (defun nato-command (text process sender response target)
+    (let ((arg (car (split-string text))))
+      (when arg
+	(random-choice (gethash (downcase arg) nato-table)))))
+  (puthash "nato" 'nato-command command-table))
