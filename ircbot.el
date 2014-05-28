@@ -8,7 +8,7 @@
 
 ;; lookup in command-table the function for a command if it exists, call it and pass it the rest of the args.
 (setq command-table (make-hash-table :test 'equal))
-(setq custom-command-table (make-hash-table :test 'equal))
+(setq custom-command-table (make-hash-table :test 'equalp))
 (setq async-command-table (make-hash-table :test 'equal))
 (setq command-needs-auth-table (make-hash-table :test 'equal))
 (setq pending-funcalls (make-hash-table :test 'equal))
@@ -241,7 +241,7 @@
 
 
 (defun define-command (text process sender response target)
-  (let ((name (car (split-string text)))
+  (let ((name (downcase (car (split-string text))))
 	(replies (cdr (split-string text))))
     (message "name: %s\nreplies: %s" name replies)
     (puthash name (apply-partially
@@ -249,14 +249,17 @@
 		      (random-choice r))
 		    replies)
 	     custom-command-table)
-    (message "%s" (gethash name custom-command-table))))
+    (format "%s defined!"
+	    (if (gethash name custom-command-table)
+		name
+	      (format "%s could not be" name)))))
+(puthash "define" 'define-command command-table)
 (defun undefine-command (text process sender response target)
   (mapcar (lambda (i)
 	    (remhash i custom-command-table))
 	  (split-string text))
   (format "Deleted %s" text))
-(puthash "define" 'define-command command-table)
 (puthash "undefine" 'undefine-command command-table)
 (defun purge-customs-command (text process sender response target)
-  (setq custom-command-table (make-hash-table :test 'equal)))
+  (setq custom-command-table (make-hash-table :test 'equalp)))
 (puthash "purge" 'purge-customs-command command-table)
