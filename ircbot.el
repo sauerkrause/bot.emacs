@@ -8,6 +8,7 @@
 
 ;; lookup in command-table the function for a command if it exists, call it and pass it the rest of the args.
 (setq command-table (make-hash-table :test 'equal))
+(setq custom-command-table (make-hash-table :test 'equal))
 (setq async-command-table (make-hash-table :test 'equal))
 (setq command-needs-auth-table (make-hash-table :test 'equal))
 (setq pending-funcalls (make-hash-table :test 'equal))
@@ -78,13 +79,17 @@
 
 (defun handle-command (text process sender response target)
   (let ((words (split-string text)))
-    (let ((command (gethash (downcase (car words)) command-table)))
+    (message
+    (let ((command (let ((builtin (gethash (downcase (car words)) command-table)))
+		     (if builtin
+			 builtin
+		       (gethash (downcase (car words)) custom-command-table)))))
       (when command
 	(apply command (list (mapconcat 'identity (cdr words) " ") 
 			       process 
 			       sender 
 			       response 
-			       target))))))
+			       target)))))))
 
 (defun async-reply (process target reply)
   (let ((reply-lines (if (listp reply)
@@ -123,6 +128,7 @@
     (maphash fn
 	     command-table)
     (maphash fn async-command-table)
+    (maphash fn custom-command-table)
     (mapconcat 'identity (sort commands 'string<) " "))))
 (puthash "commands" 'commands-command command-table)
 
@@ -232,3 +238,25 @@
        (let ((choices ,choices))
 	 (random-choice choices)))
      (puthash (symbol-name ',cmd) ',cmd command-table)))
+
+
+(defun define-command (text process sender response target)
+  (let ((name (car (split-string text)))
+	(replies (cdr (split-string text))))
+    (message "name: %s\nreplies: %s" name replies)
+    (puthash name (apply-partially
+		    (lambda (r txt p s resp trgt)
+		      (random-choice r))
+		    replies)
+	     custom-command-table)
+    (message "%s" (gethash name custom-command-table))))
+(defun undefine-command (text process sender response target)
+  (mapcar (lambda (i)
+	    (remhash i custom-command-table))
+	  (split-string text))
+  (format "Deleted %s" text))
+(puthash "define" 'define-command command-table)
+(puthash "undefine" 'undefine-command command-table)
+(defun purge-customs-command (text process sender response target)
+  (setq custom-command-table (make-hash-table :test 'equal)))
+(puthash "purge" 'purge-customs-command command-table)

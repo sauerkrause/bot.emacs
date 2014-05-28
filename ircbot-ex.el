@@ -252,3 +252,4 @@
   (puthash "nato" 'nato-command command-table))
 
 (define-reply cuisine '("sushi" "bbq" "thai" "tex mex" "mexican" "chinese" "vietnamese" "tacos/burritos" "korean" "americana" "sammiches" "burgers" "unhealthy food" "cajun" "seafood" "steak" "chicken" "pizza" "Reply hazy. Try again later." "indian"))
+
