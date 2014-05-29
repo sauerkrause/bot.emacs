@@ -144,11 +144,8 @@
 (puthash "fortune" 'fortune-command command-table)
 
 (defun fortran-command (text process sender response target)
-  (let* ((fortune (shell-command-to-string "fortune -s"))
-	 (fortran (format "PROGRAM FORTUNE\n%s\nEND PROGRAM" (upcase fortune))))
-    (split-string (replace-regexp-in-string "\t"
-					    "        "
-					    fortran) "\n")))
+  (cons "PROGRAM FORTUNE"
+	(append (mapcar 'upcase (fortune-command text process sender response target)) (list "END PROGRAM"))))
 (puthash "fortran" 'fortran-command command-table)
 
 (define-reply yes-no '("yes" "no"))

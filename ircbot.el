@@ -8,7 +8,7 @@
 
 ;; lookup in command-table the function for a command if it exists, call it and pass it the rest of the args.
 (setq command-table (make-hash-table :test 'equal))
-(setq custom-command-table (make-hash-table :test 'equalp))
+(setq custom-command-table (make-hash-table :test 'equal))
 (setq async-command-table (make-hash-table :test 'equal))
 (setq command-needs-auth-table (make-hash-table :test 'equal))
 (setq pending-funcalls (make-hash-table :test 'equal))
@@ -36,7 +36,7 @@
 				    reply
 				  (cons (if (stringp reply)
 					    reply
-					  reply) nil))))
+					  (format "%s" reply)) nil))))
 	      (mapcar (apply-partially 'rcirc-send-message process target)
 		      reply-lines))))))
 
@@ -79,7 +79,6 @@
 
 (defun handle-command (text process sender response target)
   (let ((words (split-string text)))
-    (message
     (let ((command (let ((builtin (gethash (downcase (car words)) command-table)))
 		     (if builtin
 			 builtin
@@ -89,7 +88,7 @@
 			       process 
 			       sender 
 			       response 
-			       target)))))))
+			       target))))))
 
 (defun async-reply (process target reply)
   (let ((reply-lines (if (listp reply)
@@ -128,9 +127,29 @@
     (maphash fn
 	     command-table)
     (maphash fn async-command-table)
-    (maphash fn custom-command-table)
     (mapconcat 'identity (sort commands 'string<) " "))))
 (puthash "commands" 'commands-command command-table)
+
+(defun custom-commands-command (text process sender response target)
+  (mapconcat 
+   'identity
+   (sort
+    (remove-if (lambda (k)
+		 (or (gethash k command-table)
+		     (gethash k async-command-table)))
+	       (let
+		   (commands)
+		 (maphash (lambda (k v)
+			    (setq commands (cons k commands)))
+			  custom-command-table)
+		 commands))
+    'string<)
+   " "))
+(maphash (lambda (k v)
+	   k)
+	custom-command-table)
+(puthash "custom-commands" 'custom-commands-command command-table)
+(custom-commands-command nil nil nil nil nil)
 
 (defun source-command (text process sender response target)
   "https://github.com/sauerkrause/bot.emacs")
@@ -191,7 +210,6 @@
     (puthash 'url url query-data)
     (web-http-post
      (lambda (httpc header page-data)
-       (message "%s" page-data)
        (put-title-tinyurl fn url page-data))
      :url "http://tinyurl.com/api-create.php"
      :data query-data)))
@@ -234,16 +252,15 @@
 
 (defmacro define-reply (cmd choices)
   `(progn
-     (defun ,cmd (text process sender response target)
+     (defun ,cmd (fn text process sender response target)
        (let ((choices ,choices))
-	 (random-choice choices)))
-     (puthash (symbol-name ',cmd) ',cmd command-table)))
+	 (funcall fn (random-choice choices))))
+     (puthash (symbol-name ',cmd) ',cmd async-command-table)))
 
 
 (defun define-command (text process sender response target)
   (let ((name (downcase (car (split-string text))))
 	(replies (cdr (split-string text))))
-    (message "name: %s\nreplies: %s" name replies)
     (puthash name (apply-partially
 		    (lambda (r txt p s resp trgt)
 		      (random-choice r))
@@ -254,12 +271,17 @@
 		name
 	      (format "%s could not be" name)))))
 (puthash "define" 'define-command command-table)
+
 (defun undefine-command (text process sender response target)
   (mapcar (lambda (i)
 	    (remhash i custom-command-table))
 	  (split-string text))
   (format "Deleted %s" text))
 (puthash "undefine" 'undefine-command command-table)
+
 (defun purge-customs-command (text process sender response target)
+  (maphash (lambda (k v)
+	     (remhash k custom-command-table))
+	   custom-command-table)
   (setq custom-command-table (make-hash-table :test 'equalp)))
 (puthash "purge" 'purge-customs-command command-table)
