@@ -231,6 +231,7 @@
 	     (letter-as-in "e" '("ewe"))
 	     (letter-as-in "g" '("ghoti" "gnat" "gnome" "GNU/Linux"))
 	     (letter-as-in "h" '("hour" "honor" "herb"))
+	     (letter-as-in "j" '("jalapeño" "javelina"))
 	     (letter-as-in "k" '("knight" "knot"))
 	     (letter-as-in "l" '("fifty" "Llewellyn"))
 	     (letter-as-in "m" '("mnemonic" "thousand" "Mancy"))
@@ -250,3 +251,15 @@
 
 (define-reply cuisine '("sushi" "bbq" "thai" "tex mex" "mexican" "chinese" "vietnamese" "tacos/burritos" "korean" "americana" "sammiches" "burgers" "unhealthy food" "cajun" "seafood" "steak" "chicken" "pizza" "Reply hazy. Try again later." "indian"))
 
+(define-reply where '("Up your butt and around the corner" "Your mother would know"))
+
+(defun cloud-rcirc-print-hook (process sender response target text)
+  (when (and (or (string-match
+		  (regexp-quote "☁") text)
+		 (string-match
+		  (regexp-quote "cloud") (downcase text)))
+	     (not (string= (rcirc-server-name process) sender)))
+    (let ((r (random 3)))
+      (when (eql 0 r)
+	  (rcirc-send-message process target "CLOUD")))))
+(add-hook 'rcirc-print-functions 'cloud-rcirc-print-hook)
