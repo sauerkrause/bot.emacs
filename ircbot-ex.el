@@ -258,6 +258,7 @@
 		  (regexp-quote "☁") text)
 		 (string-match
 		  (regexp-quote "cloud") (downcase text)))
+	     (not (string-match "CLOUD$" text))
 	     (not (string= (rcirc-server-name process) sender)))
     (let ((r (random 3)))
       (when (eql 0 r)
