@@ -1,14 +1,17 @@
 ;; -*- lexical-binding: t -*-
 
 (defun ping-command (text process sender response target)
+  "pongs back"
   (concat "pong " text))
 (puthash "ping" 'ping-command command-table)
 
 (defun say-command (text process sender response target)
+  "says the arguments passed"
   text)
 (puthash "say" 'say-command command-table)
 
 (defun async-say-command (fn text process sender response target)
+  "Asynchronously says the arguments passed"
   (funcall fn text))
 (puthash "async-say" 'async-say-command async-command-table)
 
@@ -77,6 +80,7 @@
 		    (handle-random-quote fn (xml-from-body body)))
 		  :url url)))
 (defun qdb-command (fn text process sender response target)
+  "Gives back a qdb quote. argument may be a quote id or 'random'"
   (let ((arg (car (split-string text))))
     (let ((api-fn (member (downcase arg) '("random" "top" "best" "latest" "bottom" "leetness" "picks"))))
       (if api-fn
@@ -86,6 +90,7 @@
 (puthash "qdb" 'qdb-command async-command-table)
 
 (defun random-command (text process sender response target)
+  "Picks a random value from a comma separated list or space separated if no commas"
   (let* ((words (mapcar (apply-partially 'replace-regexp-in-string "^ *" "")
 			(split-string text (if (find ?, text) "," " ")))))
     (random-choice words)))
@@ -93,10 +98,12 @@
 
 
 (defun uptime-command (text process sender response target)
+  "Returns uptime info from machine bot is using"
   (shell-command-to-string "uptime"))
 (puthash "uptime" 'uptime-command command-table)
 
 (defun uname-command (text process sender response target)
+  "Returns uname info from machine bot is using"
   (shell-command-to-string "uname -a"))
 (puthash "uname" 'uname-command command-table)
 
@@ -119,10 +126,12 @@
     "My reply is no."
     "My sources say no."
     "Outlook not so good."
-    "Very doubtful."))
+    "Very doubtful.")
+"Emulates an 8-ball's responses")
 
 (define-reply scale-1->10 (mapcar 'number-to-string
-				  (number-sequence 1 10)))
+				  (number-sequence 1 10))
+  "Replies back with a number between 1 and 10 (inclusive)")
 
 (defun post-jellybeans (name number)
   (let ((query-data (make-hash-table :test 'equal)))
@@ -133,10 +142,11 @@
      :url (format "http://192.168.1.17:8000/%s/jellybeans" name)
      :data query-data)))
 
-(define-reply botsnack '(":3"))
-(define-reply botsmack '("3:"))
+(define-reply botsnack '(":3") "Use to reward good bot behavior")
+(define-reply botsmack '("3:") "Use to punish bad bot behavior")
 
 (defun fortune-command (text process sender response target)
+  "Returns a fortune"
   (let ((fortune (shell-command-to-string "fortune -s")))
     (split-string (replace-regexp-in-string "\t"
 					    "        "
@@ -144,13 +154,14 @@
 (puthash "fortune" 'fortune-command command-table)
 
 (defun fortran-command (text process sender response target)
+  "Returns a fortune with FORTRAN77 syntax"
   (cons "PROGRAM FORTUNE"
 	(append (mapcar 'upcase (fortune-command text process sender response target)) (list "END PROGRAM"))))
 (puthash "fortran" 'fortran-command command-table)
 
-(define-reply yes-no '("yes" "no"))
-(define-reply poop '("💩"))
-(define-reply look-of-disapproval '("ಠ_ಠ"))
+(define-reply yes-no '("yes" "no") "Returns yes or no")
+(define-reply poop '("💩") "Displays a unicode pile of poo glyph")
+(define-reply look-of-disapproval '("ಠ_ಠ") "Returns the look of disapproval")
 
 (define-reply latvia '("Finally has internet. Kan download potato. Family is no longer cry. But no warm. Kan download blanket?"
 		       "I make field. In field, many potato. Frost come and take potato. Now I have not potato"
@@ -200,20 +211,15 @@
 		       "In America: you have potato. In Latvia: you have potato?"
 		       "Two Latvian are look at sun. Is not actually sun but meltdown from nuclear reactor. Maybe now am warm enough plant potato."
 		       "American tell joke about Latvian starvation. Latvian no get joke (or potato). Great famine become worse, many suffer."
-))
-(define-reply meta-latvia '("<DAUGHTER RAPED BY SOLDIER>. all are sad. except <SOLDIER>."
-		       "<POTATO> lose. <MALNOURISH>. such is life."
-		       "<COLD> and <MALNOURISH>. such is life."
-		       "Not happy with latvia? Good. No happy in latvia. only struggle and malnourish"
-		       "<MALNOURISH>. struggle"
-		       "<DEATH>. Happy because no more struggle"))
+) "Tells joke about latvia")
 
 (let ((flipped nil))
   (define-reply table-flip (list (let ((result (if flipped
 						   "(╯^_^）╯︵ ┬─┬"
 						 "(╯°□°）╯︵ ┻━┻")))
 				   (setq flipped (not flipped))
-				   result))))
+				   result))
+    "Flips a stateful table."))
 
 (let ((nato-table (make-hash-table :test 'equal)))
   (labels ((as-in (alos)
@@ -244,14 +250,61 @@
 	     (letter-as-in "x" '("xylophone" "Xilinx" "ten" "xenophobia"))
 	     (letter-as-in "y" '("ypres")))))
   (defun nato-command (text process sender response target)
+    "Returns a perversion of the nato alphabet for the letter given as an argument"
     (let ((arg (car (split-string text))))
       (when arg
 	(random-choice (gethash (downcase arg) nato-table)))))
   (puthash "nato" 'nato-command command-table))
 
-(define-reply cuisine '("sushi" "bbq" "thai" "tex mex" "mexican" "chinese" "vietnamese" "tacos/burritos" "korean" "americana" "sammiches" "burgers" "unhealthy food" "cajun" "seafood" "steak" "chicken" "pizza" "Reply hazy. Try again later." "indian"))
+(define-reply cuisine '("sushi" "bbq" "thai" "tex-mex" "mexican" "chinese" "vietnamese" "tacos/burritos" "korean" "americana" "sammiches" "burgers" "unhealthy food" "cajun" "seafood" "steak" "chicken" "pizza" "Reply hazy. Try again later." "indian")
+  "Tells you what kind of food to eat")
+(define-reply sushi '("Musashino Sushi Dakoro" "Maki Toki" "Mikado Ryotei" "Zushi Sushi" "Ichiban" "Odaku Sushi")
+  "Tells you where to get sushi in austin")
+(define-reply bbq '("Mann's Smokehouse BBQ" "County Line on the hill" "Franklin's (sucks to be you)" "Pok-e-Jo's" "The Salt Lick"))
+(define-reply thai '("Madam Mam's" "Satay")  "Tells you where to get thai food in austin")
+(define-reply tex-mex '("La Casita" "Casa Chapala" "Juan in a Million" "Echiladas y mas")   "Tells you where to get tex-mex in austin")
+(define-reply mexican '("La Casita" "Casa Chapala" "La Catedral del Marisco") "Tells you where to get mexican food in austin")
+(define-reply chinese '("Din Ho" "TC Noodle House" "First Chinese BBQ")   "Tells you where to get chinese food in austin")
+(define-reply vietnamese '("Pho Natic" "Pho Dan (Ph. D in Pho)" "Pho Thai Son" "Pho Saigon" "Lily's Sandwich (cash only)")
+  "Tells you where to get vietnamese food in austin")
+(define-reply tacos/burritos '("Tierra Linda" "La Casita" "Taco Shack" "Taco Deli") "Tells you where to get tacos / burritos in Austin")
+(define-reply korean '("Korea House" "Ichiban" "Odaku Sushi" "Korean Grill") "Tells you where to get Korean food in Austin")
+(define-reply americana '("The Frisco" "Ross' Old Austin Cafe" "Hyde Park Grill" "East Side Cafe" "Bartlett's")
+  "Tells you where to get good-old-fashioned american food in Austin")
+(define-reply sammiches '("Lily's Sandwich (cash only)" "Jimmy Johns" "Which wich" "Newk's") "Tells you where to get a sandwich in Austn")
+(define-reply burgers '("The Frisco" "Hopdoddy" "Ross' Old Austin Cafe" "Moonie's Burger House" "Top Notch" "Whataburger (whataclassic)") "Tells you where to get a burger in Austin")
+(define-reply cajun '("Shoal Creek Saloon" "Crawfish Shack Oyster Bar") "Tells you where to get cajun cuisine in Austin")
+(define-reply seafood '("Shoal Creek Saloon" "Crawfish Shack Oyster Bar") "Tells you where where to get seafood in Austin")
+(define-reply steak '("Ross Old Austin Cafe" "Bartlett's" "What's that place, again? the one with the steak that is so yum")
+  "Tells you where to get steak in Austin")
+(define-reply pizza '("Pinthouse Pizza" "Mangia" "Brooklyn Pie Co." "Marco's" "East Side Pies" "Conan's Pizza") "Tells you where to get yummy pizza in Austin")
+(define-reply mediterranean '("Par's Deli" "Tino's" "Santorini") "Tells you where to get mediterranean food in Austin")
+(define-reply indian '("Star of India" "The Clay Pit" "Tarka" "Masala Wok") "Tells you where to get Indian food in Austin")
 
-(define-reply where '("Up your butt and around the corner" "Your mother would know"))
+(defun food-where (fn text process sender response target)
+  "Tells you where to get food in austin by first picking a cuisine and then picking an option from that cuisine"
+  (funcall (random-choice (list 'sushi
+				'bbq
+				'thai
+				'tex-mex
+				'mexican
+				'chinese
+				'vietnamese
+				'tacos/burritos
+				'korean
+				'americana
+				'sammiches
+				'burgers
+				'cajun
+				'seafood
+				'steak
+				'pizza
+				'mediterranean
+				'indian))
+	   fn text process sender response target))
+(puthash "food-where?" 'food-where async-command-table)
+
+(define-reply where '("Up your butt and around the corner" "Your mother would know") "Tells you where you might find something")
 
 (defun cloud-rcirc-print-hook (process sender response target text)
   (when (and (or (string-match
@@ -734,4 +787,42 @@
     "It is a layer 8 problem"
     "The math co-processor had an overflow error that leaked out and shorted the RAM"
     "Leap second overloaded RHEL6 servers"
-    "DNS server drank too much and had a hiccup")))
+    "DNS server drank too much and had a hiccup"))
+  "Gives you BOFH excuse")
+
+(define-reply
+  pig
+  (list
+   (list "The Pig, if I am not mistaken,"
+	 "Gives us ham and pork and Bacon."
+	 "Let others think his heart is big,"
+	 "I think it stupid of the Pig.")
+   "For Pig so loved the world that He gave them bacon to dine upon."
+   "In the beginning, food was formless and grey. Into this blandness Pig created bacon, and tasted that it was good.")
+  "Quotes about pig")
+(define-reply
+  keyswitch
+  (list
+   "Cherry MX Red"
+   "Cherry MX Blue"
+   "Cherry MX Black"
+   "Cherry MX Brown"
+   "Cherry MX Clear"
+   "Cherry MX Green"
+   "Topre 45g"
+   "Topre 55g"
+   "Topre Ergo-weighting"
+   "Membrane Buckling Spring"
+   "Capacitive Buckling Spring"
+   "Clicky Alps"
+   "Linear Alps"
+   "Space Invader"
+   "Cherry ML"
+   "Cherry MY"
+   "MEI")
+  "Suggests a keyswitch")
+
+(define-reply
+  shh
+  '("https://warosu.org/data/fa/img/0068/20/1378104643212.gif")
+  "Shushes you")

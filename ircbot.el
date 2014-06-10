@@ -15,6 +15,7 @@
 
 ;; hook for rcirc print    
 (defun my-rcirc-highlight-hook (process sender response target text)
+  "Highlight hook that hooks in commands to rcirc when bot is highlighted."
   (when (and (string-match (concat "^" (regexp-quote (rcirc-nick process))) text)
 	     (not (string= (rcirc-server-name process) sender)))
     ;; do your stuff
@@ -25,6 +26,11 @@
        process sender target text))))
 
 (defun handle-authable-command (auth process sender target text)
+  "Handles a potentially authable command.
+
+An authable command is one which the bot operator feels should require
+authentication due to being unsafe. At the moment, authable commands
+do not exist and are not handled, ironically enough."
   (flet ((handle-line (line)
 		      (rcirc-send-message process target reply)))
 	(if auth
@@ -42,6 +48,11 @@
 
 ;; add the hook
 (defun my-rcirc-url-hook (process sender response target text)
+  "Hook that looks for urls in the text of a message that are not
+already tinyurl'd.
+
+The bot handles said urls by translating it to being the same as
+the sender instructing the bot to tinyurl the url."
   (when (not (string= (rcirc-server-name process) sender))
     (let ((urls (cl-remove-if (lambda (i)
 				(let* ((url-struct (url-generic-parse-url i))
@@ -57,10 +68,15 @@
 			     (format "tinyurl %s" url)))
 		  urls)))))
 
+;; add our print-function hooks
 (add-hook 'rcirc-print-functions 'my-rcirc-highlight-hook)
 (add-hook 'rcirc-print-functions 'my-rcirc-url-hook)
 
 (defun my-rcirc-authed-hook (process sender response target text)
+  "A hook we are not using yet which will parse the response
+from asking NickServ if nick is identified as who they are.
+After it has determined they are who they say, it will execute
+pending funcalls for said nick"
   (when (string= sender "NickServ")
     (let* ((words (split-string text))
 	   (nick (elt words 0))
@@ -74,10 +90,14 @@
 (add-hook 'rcirc-print-functions 'my-rcirc-authed-hook)
 
 (defun append-hash (key value hash)
+  "Appends a pending funcall passed in as value to the list
+currently in the key entry of hash."
   (let ((pending-calls (gethash key hash)))
     (puthash key (append pending-calls (list value)) hash)))
 
 (defun handle-command (text process sender response target)
+  "Handles a plain, old command synchronously. reads text for command
+and responds to with the output of the command if it exists"
   (let ((words (split-string text)))
     (let ((command (let ((builtin (gethash (downcase (car words)) command-table)))
 		     (if builtin
@@ -91,18 +111,28 @@
 			       target))))))
 
 (defun async-reply (process target reply)
+  "Reply function to be generally bound to a closure, passed around,
+potentially stored and called later. It will message reply
+to the bound process and target"
   (let ((reply-lines (if (listp reply)
-				    reply
-				  (cons (if (stringp reply)
-					    reply
-					  reply) nil))))
+			 reply
+		       (cons (if (stringp reply)
+				 reply
+			       reply) nil))))
     (mapcar (apply-partially 'rcirc-send-message process target)
 	    reply-lines)))
 
 (defun join-strings (words)
+  "Basically a simple reverse of split-string
+Joins words together with \" \" into a single string"
   (mapconcat 'identity words " "))
 
 (defun handle-async-command (process sender response target text)
+  "Handles a command that claims to be asynchronous.
+An async-command is stored in async-command-table and
+takes a fn as an argument which it may pass into a callback
+for a long running operation. the fn will take an argument of the
+text to reply with."
   (let ((words (split-string text)))
     (let ((command (gethash (downcase (car words)) async-command-table)))
       (when command
@@ -112,15 +142,18 @@
 		 process sender response target)))))
 
 (defun authed-command-p (text)
+  "Non-nil when command in text requires auth"
   (let ((words (split-string text)))
     (gethash (downcase (car words)) command-needs-auth-table)))
 
 (defun async-command-p (text)
+  "Non-nil when command in text is async"
   (let ((words (split-string text)))
     (gethash (downcase (car words)) async-command-table)))
 
 ;; Let's write some commands.
 (defun commands-command (text process sender response target)
+  "Command to return built-in commands of bot"
   (let (commands)
     (let ((fn (lambda (key value)
 		(setq commands (cons key commands)))))
@@ -131,6 +164,7 @@
 (puthash "commands" 'commands-command command-table)
 
 (defun custom-commands-command (text process sender response target)
+  "Command to return user-defined commands of bot"
   (mapconcat 
    'identity
    (sort
@@ -145,26 +179,28 @@
 		 commands))
     'string<)
    " "))
-(maphash (lambda (k v)
-	   k)
-	custom-command-table)
 (puthash "custom-commands" 'custom-commands-command command-table)
-(custom-commands-command nil nil nil nil nil)
 
 (defun source-command (text process sender response target)
+  "Returns URL to source of this bot"
   "https://github.com/sauerkrause/bot.emacs")
 (puthash "source" 'source-command command-table)
 
 (defun spit-page (fn url)
+  "Tells web-http-get to call fn with the page-data of the 
+url argument when it has retrieved the page."
   (web-http-get (lambda (httpc header page-data)
 		  (funcall fn page-data))
 		:url url))
 
 (defun html-from-body (body)
+  "Returns output of libxml-parse-html-region
+for a given html content"
   (with-temp-buffer
     (insert body)
     (libxml-parse-html-region (point-min)
 			      (point-max))))
+
 (defun get-elements-by-tag (dom tag)
   (let ((parsed dom))
     (let ((cur parsed)
@@ -250,9 +286,10 @@
 	       (elt choices (random (length choices)))))
 	  element)))
 
-(defmacro define-reply (cmd choices)
+(defmacro define-reply (cmd choices &optional docstring)
   `(progn
      (defun ,cmd (fn text process sender response target)
+       ,docstring
        (let ((choices ,choices))
 	 (funcall fn (random-choice choices))))
      (puthash (symbol-name ',cmd) ',cmd async-command-table)))
@@ -285,3 +322,15 @@
 	   custom-command-table)
   (setq custom-command-table (make-hash-table :test 'equalp)))
 (puthash "purge" 'purge-customs-command command-table)
+
+(defun man-command (text process sender response target)
+  "Returns the documentation string for a given function, but you probably already knew that considering you just did it."
+  (let ((name (downcase (car (split-string text))))
+	(fn nil))
+    (setq fn (gethash name command-table))
+    (unless fn
+      (setq fn (gethash name async-command-table)))
+    (if fn
+	(documentation fn))))
+(puthash "man" 'man-command command-table)
+(define-reply help '("see 'commands' for a list of available commands. use 'man <command>' to get help for a particular command") "Gives assistance in using bot")
