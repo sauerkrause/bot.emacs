@@ -2,6 +2,8 @@
 (setq channel-table (make-hash-table :test 'equal))
 (setq async-instance 0)
 (defun async-shell-command (callback name &rest args)
+  "Runs program NAME with arguments ARGS. When output is received from program, 
+CALLBACK will be called. Returns process identifier"
     (let ((proc (apply 'start-process (format "%s+%d" name async-instance) nil name args)))
       (set-process-filter proc callback)
       (setq async-instance (+ async-instance 1))
@@ -26,16 +28,22 @@
   (get-item triplet 1))
 (defun get-message (triplet)
   (get-item triplet 2))
+
 (defun build-reply (irc-proc target process output)
+  "async-reply to TARGET in IRC-PROC. OUTPUT
+is the last stdout received from PROCESS as a single string"
   (let ((origin (get-origin output))
 	(message (get-message output)))
     (async-reply irc-proc target
 		 (message "%s: %s" origin message))))
+
 (defun redis-subscribe (text process sender response target)
-  "subscribes to a redis pubsub"
+  "subscribes to a redis pubsub. ARGS are a space separated
+list of redis-channels to subscribe to"
   (let ((channels (split-string text)))
     (message "%s->%s" target channels)  
     (mapcar (lambda (channel)
+	      ;; need identifier to combine redis-channel AND target
 	      (let ((id (format "%s:%s" channel target)))
 		(unless (gethash id channel-table)
 		  (let ((proc (async-shell-command
