@@ -96,11 +96,27 @@
     (random-choice words)))
 (puthash "random" 'random-command command-table)
 
+(defun get-string-from-file (filepath)
+  "Return content of file"
+  (with-temp-buffer
+    (insert-file-contents filepath)
+    (buffer-string)))
 
 (defun uptime-command (text process sender response target)
   "Returns uptime info from machine bot is using"
-  (shell-command-to-string "uptime"))
+  (format-seconds
+   "%Y %D %h:%m:%s"
+   (string-to-number
+    (car 
+     (split-string 
+      (get-string-from-file "/proc/uptime"))))))
 (puthash "uptime" 'uptime-command command-table)
+
+(defun cpu-load-command (text process sender response target)
+  "Returns load average from machine bot is using"
+  (let ((string (split-string (get-string-from-file "/proc/loadavg"))))
+    (format "Load avg: %s" (join-strings (butlast string 2)))))
+(puthash "load" 'cpu-load-command command-table)
 
 (defun uname-command (text process sender response target)
   "Returns uname info from machine bot is using"
@@ -211,7 +227,7 @@
 		       "In America: you have potato. In Latvia: you have potato?"
 		       "Two Latvian are look at sun. Is not actually sun but meltdown from nuclear reactor. Maybe now am warm enough plant potato."
 		       "American tell joke about Latvian starvation. Latvian no get joke (or potato). Great famine become worse, many suffer."
-) "Tells joke about latvia")
+) "Tells joke about latvia. You have potato?")
 
 (let ((flipped nil))
   (define-reply table-flip (list (let ((result (if flipped
@@ -235,7 +251,7 @@
 	     (letter-as-in "c" '("czar" "cent" "hundred" "cnidaria"))
 	     (letter-as-in "d" '("django"))
 	     (letter-as-in "e" '("ewe"))
-	     (letter-as-in "g" '("ghoti" "gnat" "gnome" "GNU/Linux"))
+	     (letter-as-in "g" '("ghoti" "gnat" "gnome" "GNU/Linux, or as I've recently taken to calling it, GNU+Linux"))
 	     (letter-as-in "h" '("hour" "honor" "herb"))
 	     (letter-as-in "j" '("jalapeño" "javelina"))
 	     (letter-as-in "k" '("knight" "knot"))
@@ -824,5 +840,6 @@
 
 (define-reply
   shh
-  '("https://warosu.org/data/fa/img/0068/20/1378104643212.gif")
+  '("http://tinyurl.com/qjsfxyp")
   "Shushes you")
+
