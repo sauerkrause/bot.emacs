@@ -120,7 +120,7 @@
 
 (defun uname-command (text process sender response target)
   "Returns uname info from machine bot is using"
-  (shell-command-to-string "uname -a"))
+  (get-string-from-file "/proc/version"))
 (puthash "uname" 'uname-command command-table)
 
 (define-reply 8ball '("It is certain."
