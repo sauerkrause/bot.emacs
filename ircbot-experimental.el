@@ -9,12 +9,6 @@ CALLBACK will be called. Returns process identifier"
       (setq async-instance (+ async-instance 1))
       proc))
 
-(let ((p (async-shell-command (lambda (p o)
-				(message "%s" o))
-			      "fortune"
-			      "-s")))
-  (delete-process p))
-
 (defun get-item (triplet n)
   (let ((list (split-string triplet "\n")))
     (replace-regexp-in-string 
