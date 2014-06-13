@@ -51,11 +51,11 @@ list of redis-channels to subscribe to"
 (puthash "subscribe" 'redis-subscribe command-table)
 
 (defun redis-stop (text process sender response target)
-  "Cancels all subscriptons"
+  "Cancels all subscriptions to redis"
     (maphash (lambda (key value)
-	      (delete-process value)) channel-table)
-  (clrhash channel-table)
-  nil)
+	       (delete-process value)) channel-table)
+    (clrhash channel-table)
+    nil)
 (puthash "unsubscribe" 'redis-stop command-table)
 
 (require 'eredis)
@@ -71,11 +71,18 @@ list of redis-channels to subscribe to"
 		   (setq subscribedp t))))
 	     channel-table)
     subscribedp))
-  
+
+(defmacro with-redis-connection (host port &rest rest)
+  `(progn
+     (eredis-connect ,host ,port)
+     (unwind-protect
+	 (progn ,@rest)
+       (eredis-disconnect))))
+
 (defun irc-broadcast-hook (process sender response target text)
   "Broadcasts messages received in subscribed targets to IRC channel in redis"
   (when (subscribed-target-p target)
-      (eredis-connect *redis-host* *redis-port*)
-      (eredis-publish *redis-channel* text)
-      (eredis-disconnect)))
+    (with-redis-connection 
+     *redis-host* *redis-port*
+	  (eredis-publish *redis-channel* text))))
 (add-hook 'rcirc-print-functions 'irc-broadcast-hook)
