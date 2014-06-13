@@ -9,12 +9,6 @@ CALLBACK will be called. Returns process identifier"
       (setq async-instance (+ async-instance 1))
       proc))
 
-(let ((p (async-shell-command (lambda (p o)
-				(message "%s" o))
-			      "fortune"
-			      "-s")))
-  (delete-process p))
-
 (defun get-item (triplet n)
   (let ((list (split-string triplet "\n")))
     (replace-regexp-in-string 
@@ -58,9 +52,30 @@ list of redis-channels to subscribe to"
 
 (defun redis-stop (text process sender response target)
   "Cancels all subscriptons"
-  (let ((fn (lambda (key value)
-	      (delete-process value))))
-    (maphash fn channel-table))
+    (maphash (lambda (key value)
+	      (delete-process value)) channel-table)
   (clrhash channel-table)
   nil)
 (puthash "unsubscribe" 'redis-stop command-table)
+
+(require 'eredis)
+(setq *redis-host* "localhost")
+(setq *redis-port* "6379")
+(setq *redis-channel* "irc")
+(defun subscribed-target-p (text)
+  (let (subscribedp)
+    (maphash (lambda (key value)
+	       (let ((target (car (last (split-string key ":")))))
+		 (message "(%s)=(%s)" target text)
+		 (when (string= target text)
+		   (setq subscribedp t))))
+	     channel-table)
+    subscribedp))
+  
+(defun irc-broadcast-hook (process sender response target text)
+  "Broadcasts messages received in subscribed targets to IRC channel in redis"
+  (when (subscribed-target-p target)
+      (eredis-connect *redis-host* *redis-port*)
+      (eredis-publish *redis-channel* text)
+      (eredis-disconnect)))
+(add-hook 'rcirc-print-functions 'irc-broadcast-hook)
