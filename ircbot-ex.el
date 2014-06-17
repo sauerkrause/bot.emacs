@@ -276,7 +276,7 @@
   "Tells you what kind of food to eat")
 (define-reply sushi '("Musashino Sushi Dakoro" "Maki Toki" "Mikado Ryotei" "Zushi Sushi" "Ichiban" "Odaku Sushi")
   "Tells you where to get sushi in austin")
-(define-reply bbq '("Mann's Smokehouse BBQ" "County Line on the hill" "Franklin's (sucks to be you)" "Pok-e-Jo's" "The Salt Lick"))
+(define-reply bbq '("Mann's Smokehouse BBQ" "County Line on the hill" "Franklin's (sucks to be you)" "Pok-e-Jo's" "The Salt Lick") "tells you where to get barbecue in Austn")
 (define-reply thai '("Madam Mam's" "Satay")  "Tells you where to get thai food in austin")
 (define-reply tex-mex '("La Casita" "Casa Chapala" "Juan in a Million" "Echiladas y mas")   "Tells you where to get tex-mex in austin")
 (define-reply mexican '("La Casita" "Casa Chapala" "La Catedral del Marisco") "Tells you where to get mexican food in austin")
@@ -318,7 +318,7 @@
 				'mediterranean
 				'indian))
 	   fn text process sender response target))
-(puthash "food-where?" 'food-where async-command-table)
+(puthash "food-where" 'food-where async-command-table)
 
 (define-reply where '("Up your butt and around the corner" "Your mother would know") "Tells you where you might find something")
 
@@ -843,3 +843,7 @@
   '("http://tinyurl.com/qjsfxyp")
   "Shushes you")
 
+(define-reply
+  sting
+  '("ba-dum *ching*")
+  "Stings")

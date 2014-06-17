@@ -296,6 +296,7 @@ for a given html content"
 
 
 (defun define-command (text process sender response target)
+  "Lets users define a custom command for the bot"
   (let ((name (downcase (car (split-string text))))
 	(replies (cdr (split-string text))))
     (puthash name (apply-partially
@@ -310,6 +311,7 @@ for a given html content"
 (puthash "define" 'define-command command-table)
 
 (defun undefine-command (text process sender response target)
+  "Lets users undefine a custom command"
   (mapcar (lambda (i)
 	    (remhash i custom-command-table))
 	  (split-string text))
@@ -317,10 +319,11 @@ for a given html content"
 (puthash "undefine" 'undefine-command command-table)
 
 (defun purge-customs-command (text process sender response target)
+  "Removes all custom commands"
   (maphash (lambda (k v)
 	     (remhash k custom-command-table))
 	   custom-command-table)
-  (setq custom-command-table (make-hash-table :test 'equalp)))
+  (setq custom-command-table (make-hash-table :test 'equal)))
 (puthash "purge" 'purge-customs-command command-table)
 
 (defun man-command (text process sender response target)
