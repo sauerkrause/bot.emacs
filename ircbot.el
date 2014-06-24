@@ -43,9 +43,13 @@ do not exist and are not handled, ironically enough."
 				  (cons (if (stringp reply)
 					    reply
 					  (format "%s" reply)) nil))))
-	      (mapcar (apply-partially 'rcirc-send-message process target)
+	      (mapcar (apply-partially 'rcirc-message process target)
 		      reply-lines))))))
-
+(defun rcirc-message (process target line)
+  (let ((words (split-string line)))
+    (if (equal "/me" (car words))
+	(rcirc-cmd-me (join-strings (cdr words)) process target)
+      (rcirc-send-message process target line))))
 ;; add the hook
 (defun my-rcirc-url-hook (process sender response target text)
   "Hook that looks for urls in the text of a message that are not
@@ -261,18 +265,18 @@ for a given html content"
     (xml-parse-region (point-min) (point-max))))
 
 (defun get-weather-description (xml)
-  (format "%s and %s at %s"
+  (format "%s and %s with %s%% humidity at %s"
 	  (get-weather-attribute 'weather xml)
 	  (get-weather-attribute 'temperature_string xml)
+	  (get-weather-attribute 'relative_humidity xml)
 	  (get-weather-attribute 'location xml)))
-
 (defun get-weather-attribute (sym xml)
   (let ((tmp-node
           (car (xml-get-children (car xml)
                                  sym))))
     (car (cddr tmp-node))))
 (defun weather-command (fn text process sender response target)
-  (let* ((station (car (split-string text)))
+  (let* ((station (upcase (car (split-string text))))
 	 (url (format "http://w1.weather.gov/xml/current_obs/%s.xml" station)))
     (web-http-get (lambda (httpc headers body)
 		    (funcall fn (get-weather-description (xml-from-body body))))
