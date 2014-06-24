@@ -2378,4 +2378,9 @@
   (handle-commit fn))
 (puthash "commit" 'commit-command async-command-table)
 
-
+(defun rcirc-handler-ctcp-BOTINFO (process target sender args)
+  (rcirc-send-string process
+                     (concat "NOTICE " sender
+                             " :\C-aBOTINFO "
+			     "Come on, I'm using rcirc. How could I be a bot?"
+			     "\C-a")))
