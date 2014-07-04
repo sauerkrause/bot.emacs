@@ -1,5 +1,9 @@
 ;; -*- lexical-scoping: t -*-
 (setq channel-table (make-hash-table :test 'equal))
+
+;; use the channel-mode-table to keep track of modes in channel
+(setq channel-mode-table (make-hash-table :test 'equal))
+
 (setq async-instance 0)
 (defun async-shell-command (callback name &rest args)
   "Runs program NAME with arguments ARGS. When output is received from program, 
@@ -84,5 +88,142 @@ list of redis-channels to subscribe to"
   (when (subscribed-target-p target)
     (with-redis-connection 
      *redis-host* *redis-port*
-	  (eredis-publish *redis-channel* text))))
+	  (eredis-publish *redis-channel* (format "%s:<%s> %s" target sender text)))))
 (add-hook 'rcirc-print-functions 'irc-broadcast-hook)
+
+(defun gnufo-cmd-kick (args process target)
+  (message "calling gnufo-cmd-kick")
+  (if (opp process target)
+      (progn (message "kicking %s" (car args))
+	     (message "%s" args)
+	     (rcirc-cmd-kick (join-strings args) process target))
+    (progn (message "actioning %s" (car args))
+	   (format "/me kicks %s [%s]" 
+		   (car args)
+		   (join-strings (cdr args))))))
+
+(defun parse-modes (mode-str)
+  (let ((mode-values nil)
+	(mode-pos nil))
+    (dolist (char (string-to-list mode-str) mode-values)
+      (cond ((eq char ?+) (setq mode-pos ?+))
+	    ((eq char ?-) (setq mode-pos ?-))
+	    (t (setq mode-values (cons (format "%c%c" mode-pos char) mode-values)))))))
+
+(defun apply-modes (modes users)
+  (let (mode-pairs)
+    (dotimes (i (length modes) mode-pairs)
+      (setq mode-pairs (cons (cons (elt modes i) (elt users i)) mode-pairs)))))
+	   
+(defun merge-modes (modes diff)
+  (if (eq (elt diff 0) ?-)
+      (remq (elt diff 1) modes)
+    (cons (elt diff 1) modes)))
+
+(defun handle-mode-change (target args)
+  (let ((mode-pair-list (apply-modes (parse-modes (car args))
+	       (cdr args))))
+    (let ((channel (gethash target channel-mode-table (make-hash-table :test 'equal))))
+      (mapcar (lambda (pair)
+		(let ((mode (gethash (cdr pair) channel nil)))
+		  (message "%s" (merge-modes mode (car pair)))
+		  (message "puthashing %s" (cdr pair))
+		  (puthash (cdr pair) (merge-modes mode (car pair)) channel)))
+	      mode-pair-list)
+      (puthash target channel channel-mode-table)
+      nil)))
+
+(defun rcirc-handler-PART-or-KICK (process response channel sender nick args)
+  ;; clear modes for nick
+  (puthash nick nil (gethash channel channel-mode-table))
+  (rcirc-ignore-update-automatic nick)
+  (if (not (string= nick (rcirc-nick process)))
+      ;; this is someone else leaving
+      (progn
+	(rcirc-maybe-remember-nick-quit process nick channel)
+	(rcirc-remove-nick-channel process nick channel))
+    ;; this is us leaving
+    (mapc (lambda (n)
+	    (rcirc-remove-nick-channel process n channel))
+	  (rcirc-channel-nicks process channel))
+
+    ;; if the buffer is still around, make it inactive
+    (let ((buffer (rcirc-get-buffer process channel)))
+      (when buffer
+	(rcirc-disconnect-buffer buffer)))))
+
+(defun rcirc-handler-JOIN (process sender args text)
+  (let ((channel (car args)))
+    (puthash channel 
+	     (make-hash-table :test 'equal)
+	     channel-mode-table)
+    (with-current-buffer (rcirc-get-buffer-create process channel)
+      ;; when recently rejoining, restore the linestamp
+      (rcirc-put-nick-channel process sender channel
+			      (let ((last-activity-lines
+				     (rcirc-elapsed-lines process sender channel)))
+				(when (and last-activity-lines
+					   (< last-activity-lines rcirc-omit-threshold))
+                                  (rcirc-last-line process sender channel))))
+      ;; reset mode-line-process in case joining a channel with an
+      ;; already open buffer (after getting kicked e.g.)
+      (setq mode-line-process nil))
+
+    (rcirc-print process sender "JOIN" channel "")
+
+    ;; print in private chat buffer if it exists
+    (when (rcirc-get-buffer (rcirc-buffer-process) sender)
+      (rcirc-print process sender "JOIN" sender channel))))
+
+(defun rcirc-handler-MODE (process sender args text)
+  (let ((target (car args))
+	(msg (mapconcat 'identity (cdr args) " ")))
+    (handle-mode-change target (cdr args))
+    (message "%s" args)
+    (rcirc-print process sender "MODE"
+		 (if (string= target (rcirc-nick process))
+		     nil
+		   target)
+		 msg)
+    ;; print in private chat buffers if they exist
+    (mapc (lambda (nick)
+	    (when (rcirc-get-buffer process nick)
+	      (rcirc-print process "MODE" nick msg)))
+	  (cddr args))))
+  
+(defun opp (process target &optional nick)
+  (unless nick
+    (setq nick (rcirc-nick process)))
+  (let ((modes (gethash nick (gethash target channel-mode-table))))
+    (message "%s" modes)
+    (memq ?o modes)))
+
+(defun kick-command (text process sender response target)
+  "kicks a user"
+  (if (opp process target (car (split-string text)))
+      "No. Such scare. Much hat."
+    (gnufo-cmd-kick (split-string text) process target)))
+
+(puthash "kick" 'kick-command command-table)
+
+(defun ram-usage-kb ()
+  "Displays how much ram bot is currently consuming"
+  (let ((pid (string-to-number 
+	      (car
+	       (split-string 
+		(shell-command-to-string 
+		 "ps aux | grep emacs | grep -v grep | grep -v emacsclient | awk '{print $2}'"))))))
+    (string-to-number 
+     (car 
+      (split-string 
+       (shell-command-to-string
+	(format "cat /proc/%d/status | grep VmRSS | awk '{print $2 }'" pid)))))))
+
+(defun ram-usage (text process sender response target)
+  "Displays the current ram usage of bot"
+  (format "%d kB" (ram-usage-kb)))
+
+(puthash "ram-usage" 'ram-usage command-table)
+
+
+

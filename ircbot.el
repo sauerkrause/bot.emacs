@@ -68,8 +68,10 @@ the sender instructing the bot to tinyurl the url."
 			      (split-string text))))
       (if urls
 	  (mapcar (lambda (url)
-		    (funcall (apply-partially 'handle-async-command process sender nil target)
-			     (format "tinyurl %s" url)))
+		    (tinyurl (apply-partially 'async-reply process target) url)
+		    ;; (funcall (apply-partially 'handle-async-command process sender nil target)
+		    ;; 	     (format "tinyurl %s" url))
+		    )
 		  urls)))))
 
 ;; add our print-function hooks
@@ -232,18 +234,21 @@ for a given html content"
       (elt titles 1))))
 
 (defun put-title-tinyurl (fn url page-data)
+  (message "%s -> %s" url page-data)
   (web-http-get
-   (lambda (httpc header body)
-     (let ((content-type (gethash 'content-type header)))
-       (if (equal "text/html" (car (split-string content-type "; ")))
-	(funcall fn
-		 (format "%s%s" page-data 
-			 (let ((title (find-title body)))
-			   (if title
-			       (format " : (%s)" title)
-			     ""))))
-	(funcall fn page-data))))
-   :url url))
+      (lambda (httpc header body)
+	(let ((content-type (gethash 'content-type header)))
+	  (if (equal "301" (gethash 'status-code header))
+	      (tinyurl fn (gethash 'location header))
+	    (if (equal "text/html" (car (split-string content-type "; ")))
+		(funcall fn
+			 (format "%s%s" page-data 
+				 (let ((title (find-title body)))
+				   (if title
+				       (format " : (%s)" title)
+				     ""))))
+	      (funcall fn page-data)))))
+      :url url))
 
 (defun tinyurl (fn url)
   (let ((query-data (make-hash-table :test 'equal)))
@@ -258,7 +263,7 @@ for a given html content"
   (let* ((url (car (split-string text))))
     (tinyurl fn url)))
 (puthash "tinyurl" 'tinyurl-command async-command-table)
-
+(remhash "tinyurl" async-command-table)
 (defun xml-from-body (body)
   (with-temp-buffer
     (insert body)
