@@ -270,10 +270,13 @@ for a given html content"
     (xml-parse-region (point-min) (point-max))))
 
 (defun get-weather-description (xml)
-  (format "%s and %s (heat index %s) with %s%% humidity at %s"
+  (format "%s and %s %swith %s%% humidity at %s"
 	  (get-weather-attribute 'weather xml)
 	  (get-weather-attribute 'temperature_string xml)
-	  (get-weather-attribute 'heat_index_string xml)
+	  (let ((index (get-weather-attribute 'heat_index_string xml)))
+	    (if index
+		(format "(heat index %s) " index)
+	      ""))
 	  (get-weather-attribute 'relative_humidity xml)
 	  (get-weather-attribute 'location xml)))
 (defun get-weather-attribute (sym xml)
