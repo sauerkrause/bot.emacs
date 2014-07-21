@@ -133,6 +133,29 @@ list of redis-channels to subscribe to"
       (puthash target channel channel-mode-table)
       nil)))
 
+(defun rcirc-handler-KICK (process sender args text)
+  (let* ((channel (car args))
+	 (nick (cadr args))
+	 (reason (caddr args))
+	 (message (concat nick " " channel " " reason)))
+    (rcirc-print process sender "KICK" channel message t)
+    ;; print in private chat buffer if it exists
+    (when (rcirc-get-buffer (rcirc-buffer-process) nick)
+      (rcirc-print process sender "KICK" nick message))
+    (message "Handling kick of %s" nick)
+    (gandhi (apply-partially 'async-reply process channel) text process sender nil channel)
+    (rcirc-handler-PART-or-KICK process "KICK" channel sender nick reason)))
+
+(defun rcirc-handler-INVITE (process sender args text)
+  (message "%s" args)
+  (rcirc-cmd-join (mapconcat 'identity
+			     (remove-if-not (lambda (x)
+					      (if (arrayp x)
+						  (eq ?# (aref x 0))))
+						      args) " "))
+  (rcirc-print process sender "INVITE" nil (mapconcat 'identity args " ") t))
+
+
 (defun rcirc-handler-PART-or-KICK (process response channel sender nick args)
   ;; clear modes for nick
   (puthash nick nil (gethash channel channel-mode-table))
@@ -206,6 +229,32 @@ list of redis-channels to subscribe to"
 
 (puthash "kick" 'kick-command command-table)
 
+(defun hats-command (text process sender response target)
+  "Gives everybody hats in channel if able."
+  (mapcar
+   (lambda (x)
+     (let ((msg (format "OP %s %s" target x)))
+       (rcirc-cmd-mode (format "%s +o %s" target x))
+       ;(rcirc-send-message process "ChanServ" msg)
+       (message "%s" msg)))
+   (rcirc-channel-nicks process target))
+    "Hats gaven.")
+(puthash "hats" 'hats-command command-table)
+(puthash "tf2" 'hats-command command-table)
+
+(defun unhats-command (text process sender response target)
+  "Gives everybody hats in channel if able."
+  (mapcar
+   (lambda (x)
+     (let ((msg (format "OP %s -%s" target x)))
+       (rcirc-cmd-mode (format "%s -o %s" target x))
+;       (rcirc-send-message process "ChanServ" msg)
+       (message "%s" msg)))
+   (rcirc-channel-nicks process target))
+    "Hats removed.")
+(puthash "de-tf2" 'unhats-command command-table)
+
+
 (defun ram-usage-kb ()
   "Displays how much ram bot is currently consuming"
   (let ((pid (string-to-number 
@@ -224,6 +273,4 @@ list of redis-channels to subscribe to"
   (format "%d kB" (ram-usage-kb)))
 
 (puthash "ram-usage" 'ram-usage command-table)
-
-
 

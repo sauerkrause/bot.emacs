@@ -235,8 +235,11 @@ for a given html content"
 
 (defun put-title-tinyurl (fn url page-data)
   (message "%s -> %s" url page-data)
+  (let ((extra-headers (make-hash-table :test 'equal)))
+    (puthash 'user-agent "Mozilla/5.0 (iPad; U; CPU OS 3_2_1 like Mac OS X; en-us) AppleWebKit/531.21.10 (KHTML, like Gecko) Mobile/7B405" extra-headers)
   (web-http-get
       (lambda (httpc header body)
+	(message "%s" body)
 	(let ((content-type (gethash 'content-type header)))
 	  (if (equal "301" (gethash 'status-code header))
 	      (tinyurl fn (gethash 'location header))
@@ -248,7 +251,8 @@ for a given html content"
 				       (format " : (%s)" title)
 				     ""))))
 	      (funcall fn page-data)))))
-      :url url))
+      :url url
+      :extra-headers extra-headers)))
 
 (defun tinyurl (fn url)
   (let ((query-data (make-hash-table :test 'equal)))
@@ -268,6 +272,21 @@ for a given html content"
   (with-temp-buffer
     (insert body)
     (xml-parse-region (point-min) (point-max))))
+
+(defun rfc (fn number)
+  (let ((query-data (make-hash-table :test 'equal))
+	(url (format "http://tools.ietf.org/html/rfc%d" number)))
+    (puthash 'url url query-data)
+    (web-http-post
+     (lambda (httpc header page-data)
+       (put-title-tinyurl fn url page-data))
+     :url "http://tinyurl.com/api-create.php"
+     :data query-data)))
+
+(defun rfc-command (fn text process sender response target)
+  (let* ((num (car (split-string text))))
+    (tinyurl fn (format "http://tools.ietf.org/html/rfc%s" num))))
+(puthash "rfc" 'rfc-command async-command-table)
 
 (defun get-weather-description (xml)
   (format "%s and %s %swith %s%% humidity at %s"
