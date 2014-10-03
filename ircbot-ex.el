@@ -320,7 +320,8 @@
 	   fn text process sender response target))
 (puthash "food-where" 'food-where async-command-table)
 
-(define-reply where '("Up your butt and around the corner" "Your mother would know") "Tells you where you might find something")
+(define-reply where '("Up your butt and around the corner" "Under your couch cushions" "In your hand" "Somewhere safe where you won't forget where it is" "Your mother would know") "Tells you where you might find something")
+
 
 (defun cloud-rcirc-print-hook (process sender response target text)
   (when (and (or (string-match
@@ -2511,3 +2512,14 @@
   "[20x04] “Some say that he also has a button that makes him hum, and that if he played football for Manchester United he’d be loyal, because he’s not a potato-headed oaf. But all we know is he’s the Stig!”"
   "[20x05] “Some say he’s married to one of Princess Anne’s hats, and that he spent all week standing outside the hospital in London, pretending to be Nicholas Witchell. All we know is he’s called The Stig!”")
 "Factoid about TV's The Stig")
+
+(defun eightface-command (fn text process sender response target)
+  "(8"
+  (funcall fn "8)"))
+(puthash "8" 'eightface-command async-command-table)
+
+(define-reply fridayp (list (format "%s" (equal "Friday" (format-time-string "%A"))))
+  "Predicate for current state of friday")
+(define-reply should
+  (list "If you have to ask, no.")
+  "Tells you whether or not you should.")

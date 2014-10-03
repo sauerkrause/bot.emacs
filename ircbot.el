@@ -16,11 +16,16 @@
 ;; hook for rcirc print    
 (defun my-rcirc-highlight-hook (process sender response target text)
   "Highlight hook that hooks in commands to rcirc when bot is highlighted."
-  (when (and (string-match (concat "^" (regexp-quote (rcirc-nick process))) text)
+  (when (and (or (string-match (concat "^" (regexp-quote (rcirc-nick process))) text)
+		 (string-match (concat "^" (regexp-quote "(")) text))
 	     (not (string= (rcirc-server-name process) sender)))
     ;; do your stuff
+    (message "%s" text)
     (let ((text
-	   (replace-regexp-in-string (format "^%s[^a-zA-Z0-9]*" (regexp-quote (rcirc-nick process))) "" text)))
+	   (replace-regexp-in-string (concat "^" (regexp-quote "(")) 
+				     (replace-regexp-in-string (format "^%s[^a-zA-Z0-9]*"
+								       (regexp-quote (rcirc-nick process))) "" text))))
+      (message "stripped text: %s" text)
       (handle-authable-command
        (gethash (car (split-string text)) command-needs-auth-table)
        process sender target text))))
@@ -45,6 +50,7 @@ do not exist and are not handled, ironically enough."
 					  (format "%s" reply)) nil))))
 	      (mapcar (apply-partially 'rcirc-message process target)
 		      reply-lines))))))
+
 (defun rcirc-message (process target line)
   (let ((words (split-string line)))
     (if (equal "/me" (car words))
@@ -77,6 +83,13 @@ the sender instructing the bot to tinyurl the url."
 ;; add our print-function hooks
 (add-hook 'rcirc-print-functions 'my-rcirc-highlight-hook)
 (add-hook 'rcirc-print-functions 'my-rcirc-url-hook)
+(defun rcirc-handler-NOTICE (process sender args text)
+  (rcirc-check-auth-status process sender args text)
+  (let ((target (car args))
+        (message (cadr args)))
+    (if (string-match "^\C-a\\(.*\\)\C-a$" message)
+        (rcirc-handler-CTCP-response process target sender
+				     (match-string 1 message)))))
 
 (defun my-rcirc-authed-hook (process sender response target text)
   "A hook we are not using yet which will parse the response
