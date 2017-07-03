@@ -255,22 +255,3 @@ list of redis-channels to subscribe to"
 (puthash "de-tf2" 'unhats-command command-table)
 
 
-(defun ram-usage-kb ()
-  "Displays how much ram bot is currently consuming"
-  (let ((pid (string-to-number 
-	      (car
-	       (split-string 
-		(shell-command-to-string 
-		 "ps aux | grep emacs | grep -v grep | grep -v emacsclient | awk '{print $2}'"))))))
-    (string-to-number 
-     (car 
-      (split-string 
-       (shell-command-to-string
-	(format "cat /proc/%d/status | grep VmRSS | awk '{print $2 }'" pid)))))))
-
-(defun ram-usage (text process sender response target)
-  "Displays the current ram usage of bot"
-  (format "%d kB" (ram-usage-kb)))
-
-(puthash "ram-usage" 'ram-usage command-table)
-
