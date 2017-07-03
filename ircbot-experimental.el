@@ -243,7 +243,7 @@ list of redis-channels to subscribe to"
 (puthash "tf2" 'hats-command command-table)
 
 (defun unhats-command (text process sender response target)
-  "Gives everybody hats in channel if able."
+  "Takes away everybody's hats in channel if able."
   (mapcar
    (lambda (x)
      (let ((msg (format "OP %s -%s" target x)))
