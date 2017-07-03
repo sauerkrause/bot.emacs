@@ -23,6 +23,7 @@
     (message "%s" text)
     (let ((text
 	   (replace-regexp-in-string (concat "^" (regexp-quote "(")) 
+				     ""
 				     (replace-regexp-in-string (format "^%s[^a-zA-Z0-9]*"
 								       (regexp-quote (rcirc-nick process))) "" text))))
       (message "stripped text: %s" text)
