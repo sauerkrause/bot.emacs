@@ -302,30 +302,6 @@ for a given html content"
     (tinyurl fn (format "http://tools.ietf.org/html/rfc%s" num))))
 (puthash "rfc" 'rfc-command async-command-table)
 
-(defun get-weather-description (xml)
-  (format "%s and %s %swith %s%% humidity at %s"
-	  (get-weather-attribute 'weather xml)
-	  (get-weather-attribute 'temperature_string xml)
-	  (let ((index (get-weather-attribute 'heat_index_string xml)))
-	    (if index
-		(format "(heat index %s) " index)
-	      ""))
-	  (get-weather-attribute 'relative_humidity xml)
-	  (get-weather-attribute 'location xml)))
-(defun get-weather-attribute (sym xml)
-  (let ((tmp-node
-          (car (xml-get-children (car xml)
-                                 sym))))
-    (car (cddr tmp-node))))
-(defun weather-command (fn text process sender response target)
-  (let* ((station (upcase (car (split-string text))))
-	 (url (format "http://w1.weather.gov/xml/current_obs/%s.xml" station)))
-    (web-http-get (lambda (httpc headers body)
-		    (funcall fn (get-weather-description (xml-from-body body))))
-		  :url url)))
-(puthash "weather" 'weather-command async-command-table)
-
-
 (defun random-choice (choices)
   (if (and choices (listp choices))
 	(let ((element 
